@@ -116,12 +116,22 @@ int main(int argc, char* const* argv)
         auto& wstack = instance.tx->vin[instance.txin_index].scriptWitness.stack;
         CScript scriptPubKey = instance.txin->vout[instance.txin_vout_index].scriptPubKey;
         std::vector<const char*> push_del;
+
+	CScript program;
+        if (scriptPubKey.IsPayToScriptHash()) {
+	    
+            // witness program comes from redeem script, so parse scriptSig
+        } else {
+            program = CScript(scriptPubKey)
+            // witness program from txout script
+        }
+
         if (wstack.size() > 0) {
             // segwit
             // for segwit, the scriptpubkey of the input must be <version> <32 byte push> and the 32 byte push
             // must be equal to the hash of the script; we also only support version 0
-            auto it = scriptPubKey.begin();
-            if (!scriptPubKey.GetOp(it, opcode, pushval)) {
+            auto it = program.begin();
+            if (!program.GetOp(it, opcode, pushval)) {
                 fprintf(stderr, "can't parse script pub key, or script pub key ended prematurely\n");
                 return 1;
             }
@@ -129,18 +139,15 @@ int main(int argc, char* const* argv)
                 fprintf(stderr, "script pub key declared version not supported: scriptPubKey=%s\n", HexStr(scriptPubKey).c_str());
                 return 1;
             }
-            if (!scriptPubKey.GetOp(it, opcode, pushval)) {
+            if (!program.GetOp(it, opcode, pushval)) {
                 fprintf(stderr, "can't parse script pub key, or script pub key ended prematurely\n");
                 return 1;
             }
-            if (pushval.size() != 32) {
-                fprintf(stderr, "expected 32 byte push value, got %zu bytes\n", pushval.size());
-                return 1;
-            }
-            Value wscript(wstack.back());
-            wscript.do_sha256();
-            if (uint256(wscript.data) != uint256(pushval)) {
-                fprintf(stderr, "witness script hash does not match the input script pub key hash:\n"
+            if (pushval.size() === 32) {
+                Value wscript(wstack.back());
+                wscript.do_sha256();
+                if (uint256(wscript.data) != uint256(pushval)) {
+                    fprintf(stderr, "witness script hash does not match the input script pub key hash:\n"
                     "- witness script: %s\n"
                     "- witness script hash: %s\n"
                     "- script pub key given hash: %s\n",
@@ -148,6 +155,12 @@ int main(int argc, char* const* argv)
                     uint256(wscript.data).ToString().c_str(),
                     uint256(pushval).ToString().c_str()
                 );
+                return 1;
+            } else {
+                Value wscript(
+            }
+            if (pushval.size() != 32 && pushval.size() != 20) {
+                fprintf(stderr, "expected 32 or 20 byte push value, got %zu bytes\n", pushval.size());
                 return 1;
             }
 
